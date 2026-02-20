@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ScalaCompilerConfiguration">
+    <option name="separateProdTestSources" value="true" />
+    <profile name="sbt 1" modules="streamforge,streamforge.main,streamforge.test,streamforge_917,streamforge_917.main,streamforge_917.test" />
+  </component>
+</project>
