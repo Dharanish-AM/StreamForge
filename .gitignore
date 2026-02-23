@@ -1,9 +1,24 @@
+
+# === Build output ===
 target/
+
+# === sbt/Scala/Metals ===
 /.bsp/
 /.metals/
 /.bloop/
+
+# === IDEs and Editors ===
 /.idea/
+/.vscode/
+
+# === macOS system files ===
 .DS_Store
+
+# === Logs and compiled classes ===
 *.log
 *.class
-target/
+
+# === Miscellaneous ===
+*.swp
+*.swo
+*~
