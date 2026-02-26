@@ -1,35 +1,25 @@
-ThisBuild / scalaVersion := "2.13.12"
+name := """StreamForge"""
+organization := "com.example"
 
-val Http4sVersion = "0.23.26"
-val CatsEffectVersion = "3.5.4"
-val CirceVersion = "0.14.7"
-val DoobieVersion = "1.0.0-RC4"
+version := "1.0-SNAPSHOT"
 
-lazy val root = (project in file("."))
-  .settings(
-    name := "scala-http4s-app",
+lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
-    libraryDependencies ++= Seq(
+scalaVersion := "2.13.12"
 
-      // Cats Effect
-      "org.typelevel" %% "cats-effect" % CatsEffectVersion,
+libraryDependencies ++= Seq(
+  guice,
+  "com.typesafe.play" %% "play-slick" % "5.1.0",
+  "com.typesafe.play" %% "play-slick-evolutions" % "5.1.0",
+  "org.postgresql" % "postgresql" % "42.7.1",
+  "org.scalatestplus.play" %% "scalatestplus-play" % "5.1.0" % Test
+)
 
-      // http4s
-      "org.http4s" %% "http4s-ember-server" % Http4sVersion,
-      "org.http4s" %% "http4s-dsl" % Http4sVersion,
-      "org.http4s" %% "http4s-circe" % Http4sVersion,
+javaOptions ++= Seq(
+  "--add-opens=java.base/java.lang=ALL-UNNAMED",
+  "--add-opens=java.base/java.util=ALL-UNNAMED",
+  "--add-opens=java.base/sun.security.ssl=ALL-UNNAMED"
+)
 
-      // Circe JSON
-      "io.circe" %% "circe-generic" % CirceVersion,
-      "io.circe" %% "circe-parser" % CirceVersion,
-
-      // Doobie
-      "org.tpolecat" %% "doobie-core" % DoobieVersion,
-      "org.tpolecat" %% "doobie-postgres" % DoobieVersion,
-      "org.tpolecat" %% "doobie-hikari" % DoobieVersion,
-
-      // Logging
-      "org.typelevel" %% "log4cats-slf4j" % "2.6.0",
-      "ch.qos.logback" % "logback-classic" % "1.5.6"
-    )
-  )
+run / fork := true
+test / fork := true

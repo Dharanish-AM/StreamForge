@@ -1,24 +1,29 @@
 
-# === Build output ===
 target/
+project/project/
+project/target/
+.cache/
+.history/
+.lib/
+dist/
 
-# === sbt/Scala/Metals ===
-/.bsp/
-/.metals/
-/.bloop/
 
-# === IDEs and Editors ===
-/.idea/
-/.vscode/
+.metals/
+.bloop/
+.bsp/
 
-# === macOS system files ===
+
+.idea/
+*.iml
+*.iws
+
+
+logs/
+run.pid
+RUNNING_PID
+conf/evolutions/default/1.sql.pending
+
+
 .DS_Store
-
-# === Logs and compiled classes ===
-*.log
-*.class
-
-# === Miscellaneous ===
 *.swp
-*.swo
-*~
+*.bak
