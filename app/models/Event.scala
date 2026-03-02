@@ -1,11 +1,11 @@
 package models
 
-import java.sql.Timestamp
+import java.time.Instant
 
 case class Event(
     id: Int,
     userId: Int,
-    amount: Double,
+    amount: BigDecimal,
     eventType: String,
-    createdAt: Timestamp
+    createdAt: Instant
 )
