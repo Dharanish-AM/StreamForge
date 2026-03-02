@@ -28,3 +28,7 @@ conf/evolutions/default/1.sql.pending
 .DS_Store
 *.swp
 *.bak
+
+.env
+.env.*
+!.env.example
