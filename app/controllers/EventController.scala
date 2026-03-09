@@ -3,7 +3,7 @@ package controllers
 import javax.inject._
 import dto.{CreateEventRequest, EventResponse, UpdateEventRequest}
 import errors.BadRequestException
-import play.api.libs.json.{JsError, JsValue, Json, Reads}
+import play.api.libs.json.{JsError, JsValue, Json}
 import play.api.mvc._
 import services.EventService
 
@@ -18,65 +18,71 @@ class EventController @Inject() (
 )(implicit ec: ExecutionContext)
     extends AbstractController(cc) {
 
-  private def toResponse(event: Event): EventResponse =
-    EventResponse(event.id, event.userId, event.amount, event.eventType, event.createdAt)
-
-  private def newEvent(request: CreateEventRequest): Event =
-    Event(
-      id = 0,
-      userId = request.userId,
-      amount = request.amount,
-      eventType = request.eventType,
-      createdAt = Instant.now()
-    )
-
-  private def mergeUpdate(id: Int, existing: Event, request: UpdateEventRequest): Event =
-    Event(
-      id = id,
-      userId = request.userId,
-      amount = request.amount,
-      eventType = request.eventType,
-      createdAt = existing.createdAt
-    )
-
-  private def validateJson[A: Reads](body: JsValue): Future[A] =
-    body
-      .validate[A]
-      .fold(
-        errors => Future.failed(BadRequestException(s"Invalid JSON: ${JsError.toJson(errors)}")),
-        Future.successful
-      )
-
   def createEvent: Action[JsValue] = Action.async(parse.json) { request =>
-    validateJson[CreateEventRequest](request.body).flatMap { createRequest =>
-      val eventToCreate = newEvent(createRequest)
+    request.body.validate[CreateEventRequest].fold(
+      errors => Future.failed(BadRequestException(s"Invalid JSON: ${JsError.toJson(errors)}")),
+      createRequest => {
+        val eventToCreate = Event(
+          id = 0,
+          userId = createRequest.userId,
+          amount = createRequest.amount,
+          eventType = createRequest.eventType,
+          createdAt = Instant.now()
+        )
 
-      service.createEvent(eventToCreate).map { createdId =>
-        val createdEvent = eventToCreate.copy(id = createdId)
-        Created(Json.toJson(toResponse(createdEvent)))
+        service.createEvent(eventToCreate).map { createdId =>
+          val createdEvent = eventToCreate.copy(id = createdId)
+          Created(
+            Json.toJson(
+              EventResponse(
+                createdEvent.id,
+                createdEvent.userId,
+                createdEvent.amount,
+                createdEvent.eventType,
+                createdEvent.createdAt
+              )
+            )
+          )
+        }
       }
-    }
+    )
   }
 
   def getAllEvents: Action[AnyContent] = Action.async { _ =>
     service.getAllEvents.map { events =>
-      Ok(Json.toJson(events.map(toResponse)))
+      Ok(
+        Json.toJson(
+          events.map(event =>
+            EventResponse(event.id, event.userId, event.amount, event.eventType, event.createdAt)
+          )
+        )
+      )
     }
   }
 
   def getEventById(id: Int): Action[AnyContent] = Action.async { _ =>
     service.getEventById(id).map { e =>
-      Ok(Json.toJson(toResponse(e)))
+      Ok(Json.toJson(EventResponse(e.id, e.userId, e.amount, e.eventType, e.createdAt)))
     }
   }
 
   def updateEvent(id: Int): Action[JsValue] = Action.async(parse.json) { request =>
-    validateJson[UpdateEventRequest](request.body).flatMap { updateRequest =>
-      service.getEventById(id).flatMap { existingEvent =>
-        val updatedEvent = mergeUpdate(id, existingEvent, updateRequest)
-        service.updateEvent(id, updatedEvent).map(_ => NoContent)
+    request.body.validate[UpdateEventRequest].fold(
+      errors => Future.failed(BadRequestException(s"Invalid JSON: ${JsError.toJson(errors)}")),
+      updateRequest => {
+        service.getEventById(id).flatMap { existingEvent =>
+          val updatedEvent = Event(
+            id = id,
+            userId = updateRequest.userId,
+            amount = updateRequest.amount,
+            eventType = updateRequest.eventType,
+            createdAt = existingEvent.createdAt
+          )
+
+          service.updateEvent(id, updatedEvent).map(_ => NoContent)
+        }
       }
-    }
+    )
   }
 
   def deleteEvent(id: Int): Action[AnyContent] = Action.async { _ =>
