@@ -1,6 +1,5 @@
 package services
 
-import errors.NotFoundException
 import repositories.EventRepository
 import scala.concurrent.Future
 import models.Event
@@ -17,24 +16,12 @@ class EventService @Inject() (eventRepository: EventRepository)(implicit ec: Exe
   def getAllEvents: Future[Seq[Event]] =
     eventRepository.getAll
 
-  def getEventById(id: Int): Future[Event] =
-    eventRepository.getById(id).map { event =>
-      event.getOrElse(throw NotFoundException(s"Event with id $id not found"))
-    }
+  def getEventById(id: Int): Future[Option[Event]] =
+    eventRepository.getById(id)
 
   def updateEvent(id: Int, updatedEvent: Event): Future[Int] =
-    eventRepository.update(id, updatedEvent).map { rowsUpdated =>
-      if (rowsUpdated == 0) {
-        throw NotFoundException(s"Event with id $id not found")
-      }
-      rowsUpdated
-    }
+    eventRepository.update(id, updatedEvent)
 
   def deleteEvent(id: Int): Future[Int] =
-    eventRepository.delete(id).map { rowsDeleted =>
-      if (rowsDeleted == 0) {
-        throw NotFoundException(s"Event with id $id not found")
-      }
-      rowsDeleted
-    }
+    eventRepository.delete(id)
 }

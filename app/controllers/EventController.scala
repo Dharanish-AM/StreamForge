@@ -2,7 +2,6 @@ package controllers
 
 import javax.inject._
 import dto.{CreateEventRequest, EventResponse, UpdateEventRequest}
-import errors.BadRequestException
 import play.api.libs.json.{JsError, JsValue, Json}
 import play.api.mvc._
 import services.EventService
@@ -20,7 +19,10 @@ class EventController @Inject() (
 
   def createEvent: Action[JsValue] = Action.async(parse.json) { request =>
     request.body.validate[CreateEventRequest].fold(
-      errors => Future.failed(BadRequestException(s"Invalid JSON: ${JsError.toJson(errors)}")),
+      errors =>
+        Future.successful(
+          BadRequest(Json.obj("message" -> s"Invalid JSON: ${JsError.toJson(errors)}"))
+        ),
       createRequest => {
         val eventToCreate = Event(
           id = 0,
@@ -62,30 +64,59 @@ class EventController @Inject() (
 
   def getEventById(id: Int): Action[AnyContent] = Action.async { _ =>
     service.getEventById(id).map { e =>
-      Ok(Json.toJson(EventResponse(e.id, e.userId, e.amount, e.eventType, e.createdAt)))
+      e match {
+        case Some(event) =>
+          Ok(
+            Json.toJson(
+              EventResponse(event.id, event.userId, event.amount, event.eventType, event.createdAt)
+            )
+          )
+        case None => NotFound(Json.obj("message" -> s"Event with id $id not found"))
+      }
     }
   }
 
   def updateEvent(id: Int): Action[JsValue] = Action.async(parse.json) { request =>
     request.body.validate[UpdateEventRequest].fold(
-      errors => Future.failed(BadRequestException(s"Invalid JSON: ${JsError.toJson(errors)}")),
+      errors =>
+        Future.successful(
+          BadRequest(Json.obj("message" -> s"Invalid JSON: ${JsError.toJson(errors)}"))
+        ),
       updateRequest => {
         service.getEventById(id).flatMap { existingEvent =>
-          val updatedEvent = Event(
-            id = id,
-            userId = updateRequest.userId,
-            amount = updateRequest.amount,
-            eventType = updateRequest.eventType,
-            createdAt = existingEvent.createdAt
-          )
+          existingEvent match {
+            case Some(event) =>
+              val updatedEvent = Event(
+                id = id,
+                userId = updateRequest.userId,
+                amount = updateRequest.amount,
+                eventType = updateRequest.eventType,
+                createdAt = event.createdAt
+              )
 
-          service.updateEvent(id, updatedEvent).map(_ => NoContent)
+              service.updateEvent(id, updatedEvent).map { rowsUpdated =>
+                if (rowsUpdated == 0) {
+                  NotFound(Json.obj("message" -> s"Event with id $id not found"))
+                } else {
+                  NoContent
+                }
+              }
+
+            case None =>
+              Future.successful(NotFound(Json.obj("message" -> s"Event with id $id not found")))
+          }
         }
       }
     )
   }
 
   def deleteEvent(id: Int): Action[AnyContent] = Action.async { _ =>
-    service.deleteEvent(id).map(_ => NoContent)
+    service.deleteEvent(id).map { rowsDeleted =>
+      if (rowsDeleted == 0) {
+        NotFound(Json.obj("message" -> s"Event with id $id not found"))
+      } else {
+        NoContent
+      }
+    }
   }
 }
