@@ -2,12 +2,20 @@ package repositories
 
 import javax.inject._
 import scala.concurrent.{ExecutionContext, Future}
-import slick.jdbc.PostgresProfile.api._
 import models.Event
 import tables.EventTable.events
+import play.api.db.slick.DatabaseConfigProvider
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 
 @Singleton
-class EventRepository @Inject() (db: Database)(implicit ec: ExecutionContext) {
+class EventRepository @Inject() (
+    protected val dbConfigProvider: DatabaseConfigProvider
+)(implicit ec: ExecutionContext) {
+
+  private val dbConfig: DatabaseConfig[JdbcProfile] = dbConfigProvider.get[JdbcProfile]
+  import dbConfig._
+  import profile.api._
 
   // insert event
   def create(event: Event): Future[Int] = {

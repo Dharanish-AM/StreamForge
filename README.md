@@ -1,33 +1,41 @@
 # StreamForge
 
-StreamForge is a Play Framework backend service written in Scala.
+StreamForge is a backend service built with **Play Framework (Scala)**.  
+At this stage, the project is a foundation scaffold with database wiring, schema evolution, and a health endpoint.
 
-Current implementation includes:
-- Health check endpoint
-- PostgreSQL connectivity via Play-Slick
-- Play Evolutions with initial `events` schema
+---
+
+## Current Status
+
+Implemented:
+
+- ✅ `GET /health` endpoint
+- ✅ PostgreSQL integration via **Play-Slick**
+- ✅ Play Evolutions enabled
+- ✅ Initial `events` schema (`conf/evolutions/default/1.sql`)
+- ✅ Base domain model: `app/models/Event.scala`
+
+Planned (not implemented yet):
+
+- ⏳ Event ingestion APIs
+- ⏳ Repository implementations (`app/repositories`)
+- ⏳ Service layer implementations (`app/services`)
+- ⏳ Analytics/aggregation endpoints
+
+---
 
 ## Tech Stack
 
-- Scala 2.13.18
-- Play Framework (Play Scala)
-- Slick + Play-Slick + Play-Slick-Evolutions
-- PostgreSQL
-- SBT
+- **Scala**: `2.13.18`
+- **Play Framework**: Play Scala
+- **Database Access**: Slick + Play-Slick + Play-Slick-Evolutions
+- **Database**: PostgreSQL
+- **Build Tool**: SBT
+- **JDK**: 17+
 
-## Current Scope
+---
 
-Implemented now:
-- `GET /health` endpoint returning `OK`
-- Initial evolution creating `events` table and indexes
-- Base `Event` domain model (`app/models/Event.scala`)
-
-Not yet implemented:
-- Event ingestion APIs
-- Repository/service logic in `app/repositories` and `app/services`
-- Analytics endpoints
-
-## Project Layout
+## Repository Structure
 
 ```text
 app/
@@ -35,22 +43,29 @@ app/
     HealthController.scala
   models/
     Event.scala
-  repositories/          # currently empty
-  services/              # currently empty
+  repositories/              # currently empty
+  services/                  # currently empty
 conf/
-  routes
+  evolutions/default/
+    1.sql
   application.conf
-  evolutions/default/1.sql
+  routes
 build.sbt
 ```
 
+---
+
 ## Prerequisites
 
-- JDK 17+
-- SBT
-- PostgreSQL running locally
+Install and ensure availability of:
 
-## Local Development
+- JDK 17 or newer
+- SBT
+- PostgreSQL (local or reachable instance)
+
+---
+
+## Getting Started (Local)
 
 ### 1) Create database
 
@@ -58,16 +73,19 @@ build.sbt
 CREATE DATABASE streamforge;
 ```
 
-### 2) Configure application settings
+### 2) Configure app settings
 
-Default development values already exist in `conf/application.conf`:
+Default dev values are already set in `conf/application.conf`.
+
+Default local values:
+
 - DB URL: `jdbc:postgresql://localhost:5432/streamforge`
 - DB user: `dharanisham`
-- DB password: empty
+- DB password: *(empty)*
 - Play secret key: `dev-only-change-me`
-- Evolutions auto-apply: enabled
+- Evolutions auto-apply: enabled for development
 
-You can override any value with environment variables (for example in shell or `.env`):
+Optional overrides via environment variables:
 
 ```bash
 export STREAMFORGE_DB_URL="jdbc:postgresql://localhost:5432/streamforge"
@@ -76,26 +94,30 @@ export STREAMFORGE_DB_PASSWORD=""
 export PLAY_HTTP_SECRET_KEY="dev-secret-for-local-run"
 ```
 
-### 3) Run the app
+> On macOS (zsh), you can add these to `~/.zshrc` and run `source ~/.zshrc`.
+
+### 3) Run the service
 
 ```bash
 sbt run
 ```
 
-Optional custom port:
+Run on a custom port:
 
 ```bash
 sbt -Dhttp.port=9001 run
 ```
 
-## API
+---
 
-### Health
+## API Reference
 
-- Method: `GET`
-- Path: `/health`
-- Response: `200 OK`
-- Body: `OK`
+### Health Check
+
+- **Method**: `GET`
+- **Path**: `/health`
+- **Response**: `200 OK`
+- **Body**: `OK`
 
 Example:
 
@@ -103,23 +125,50 @@ Example:
 curl http://localhost:9000/health
 ```
 
+---
+
 ## Database Evolution
 
-Initial evolution: `conf/evolutions/default/1.sql`
+Initial evolution file:
 
-Creates:
-- Table: `events`
-  - `id SERIAL PRIMARY KEY`
-  - `user_id INTEGER NOT NULL`
-  - `amount NUMERIC(18,2) NOT NULL`
-  - `event_type VARCHAR(100) NOT NULL`
-  - `created_at TIMESTAMP NOT NULL DEFAULT NOW()`
-- Indexes:
-  - `idx_events_user_id`
-  - `idx_events_created_at`
-  - `idx_events_event_type`
+- `conf/evolutions/default/1.sql`
 
-## Notes
+### Schema created
 
-- This repository is currently a foundation backend scaffold.
-- `app/repositories` and `app/services` are intentionally empty as the next implementation step.
+`events` table:
+
+- `id SERIAL PRIMARY KEY`
+- `user_id INTEGER NOT NULL`
+- `amount NUMERIC(18,2) NOT NULL`
+- `event_type VARCHAR(100) NOT NULL`
+- `created_at TIMESTAMP NOT NULL DEFAULT NOW()`
+
+Indexes:
+
+- `idx_events_user_id`
+- `idx_events_created_at`
+- `idx_events_event_type`
+
+---
+
+## Development Notes
+
+- This codebase currently provides the base backend infrastructure.
+- `repositories` and `services` directories are intentionally present for next-phase implementation.
+- Evolutions are enabled to keep DB schema in sync during development.
+
+---
+
+## Next Suggested Milestones
+
+1. Add event ingestion endpoint(s) (e.g., create/list events)
+2. Implement repository layer with Slick queries
+3. Add service layer validations/business rules
+4. Add tests for controller, repository, and service layers
+5. Introduce analytics endpoints (totals, trends, user/event breakdown)
+
+---
+
+## License
+
+Add a license file (`LICENSE`) if this project is intended for public/open-source use.
