@@ -17,43 +17,36 @@ class EventRepository @Inject() (
   import dbConfig._
   import profile.api._
 
-  // insert event
-  def create(event: Event): Future[Int] = {
-    val insertQuery =
-      (events.map(e => (e.userId, e.amount, e.eventType, e.createdAt)) returning events.map(
-        _.id
-      )) +=
+  private val insertProjection = events.map(e => (e.userId, e.amount, e.eventType, e.createdAt))
+
+  def create(event: Event): Future[Int] =
+    db.run(
+      (insertProjection returning events.map(_.id)) +=
         (event.userId, event.amount, event.eventType, event.createdAt)
-    db.run(insertQuery)
-  }
+    )
 
-  // get all events
-  def getAll: Future[Seq[Event]] = {
-    val getAllQuery = events.result
-    db.run(getAllQuery)
-  }
+  def getAll: Future[Seq[Event]] =
+    db.run(events.result)
 
-  // get by id
-  def getById(id: Int): Future[Option[Event]] = {
-    val getByIdQuery = events.filter(_.id === id).result.headOption
-    db.run(getByIdQuery)
-  }
+  def getById(id: Int): Future[Option[Event]] =
+    db.run(events.filter(_.id === id).result.headOption)
 
-  // update by id
-  def update(id: Int, updatedEvent: Event): Future[Int] = {
-    val updateQuery = events
-      .filter(_.id === id)
-      .map(e => (e.userId, e.amount, e.eventType, e.createdAt))
-      .update(
-        (updatedEvent.userId, updatedEvent.amount, updatedEvent.eventType, updatedEvent.createdAt)
-      )
-    db.run(updateQuery)
-  }
+  def update(id: Int, updatedEvent: Event): Future[Int] =
+    db.run(
+      events
+        .filter(_.id === id)
+        .map(e => (e.userId, e.amount, e.eventType, e.createdAt))
+        .update(
+          (
+            updatedEvent.userId,
+            updatedEvent.amount,
+            updatedEvent.eventType,
+            updatedEvent.createdAt
+          )
+        )
+    )
 
-  // delete
-  def delete(id: Int): Future[Int] = {
-    val deleteQuery = events.filter(_.id === id).delete
-    db.run(deleteQuery)
-  }
+  def delete(id: Int): Future[Int] =
+    db.run(events.filter(_.id === id).delete)
 
 }

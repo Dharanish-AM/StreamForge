@@ -1,174 +1,126 @@
 # StreamForge
 
-StreamForge is a backend service built with **Play Framework (Scala)**.  
-At this stage, the project is a foundation scaffold with database wiring, schema evolution, and a health endpoint.
+StreamForge is a simple event-tracking backend built with Play Framework + Scala.
 
----
+This README is written for beginners and focuses on:
+- what each layer does,
+- how request flow works,
+- and how to run and test the API quickly.
 
-## Current Status
+## What This App Does
 
-Implemented:
-
-- ✅ `GET /health` endpoint
-- ✅ PostgreSQL integration via **Play-Slick**
-- ✅ Play Evolutions enabled
-- ✅ Initial `events` schema (`conf/evolutions/default/1.sql`)
-- ✅ Base domain model: `app/models/Event.scala`
-
-Planned (not implemented yet):
-
-- ⏳ Event ingestion APIs
-- ⏳ Repository implementations (`app/repositories`)
-- ⏳ Service layer implementations (`app/services`)
-- ⏳ Analytics/aggregation endpoints
-
----
+The app stores events in PostgreSQL and exposes CRUD APIs:
+- create an event,
+- list all events,
+- get one event by id,
+- update an event,
+- delete an event.
 
 ## Tech Stack
 
-- **Scala**: `2.13.18`
-- **Play Framework**: Play Scala
-- **Database Access**: Slick + Play-Slick + Play-Slick-Evolutions
-- **Database**: PostgreSQL
-- **Build Tool**: SBT
-- **JDK**: 17+
+- Scala `2.13.18`
+- Play Framework
+- Slick + Play-Slick
+- PostgreSQL
+- SBT
 
----
-
-## Repository Structure
+## Project Layout (Beginner View)
 
 ```text
 app/
-  controllers/
-    HealthController.scala
-  models/
-    Event.scala
-  repositories/              # currently empty
-  services/                  # currently empty
+  controllers/      # HTTP layer: request/response handling
+  services/         # business rules and validation logic
+  repositories/     # database queries (Slick)
+  tables/           # Slick table mapping
+  models/           # domain model (Event)
+  dto/              # input/output API payloads
+  errors/           # custom exceptions + JSON error handler
 conf/
-  evolutions/default/
-    1.sql
-  application.conf
-  routes
-build.sbt
+  routes            # endpoint -> controller mapping
+  application.conf  # app and DB configuration
+  evolutions/       # database migrations
 ```
 
----
+## Request Flow
+
+For `POST /api/events` (same idea for other APIs):
+
+1. `EventController` validates JSON and builds `Event`.
+2. `EventService` applies business checks.
+3. `EventRepository` runs Slick query.
+4. Controller returns JSON response.
 
 ## Prerequisites
 
-Install and ensure availability of:
-
-- JDK 17 or newer
+- JDK 17+
 - SBT
-- PostgreSQL (local or reachable instance)
+- PostgreSQL
 
----
+## Run Locally
 
-## Getting Started (Local)
-
-### 1) Create database
+1. Create DB:
 
 ```sql
 CREATE DATABASE streamforge;
 ```
 
-### 2) Configure app settings
+2. Check DB config in `conf/application.conf`.
 
-Default dev values are already set in `conf/application.conf`.
-
-Default local values:
-
-- DB URL: `jdbc:postgresql://localhost:5432/streamforge`
-- DB user: `dharanisham`
-- DB password: *(empty)*
-- Play secret key: `dev-only-change-me`
-- Evolutions auto-apply: enabled for development
-
-Optional overrides via environment variables:
-
-```bash
-export STREAMFORGE_DB_URL="jdbc:postgresql://localhost:5432/streamforge"
-export STREAMFORGE_DB_USER="dharanisham"
-export STREAMFORGE_DB_PASSWORD=""
-export PLAY_HTTP_SECRET_KEY="dev-secret-for-local-run"
-```
-
-> On macOS (zsh), you can add these to `~/.zshrc` and run `source ~/.zshrc`.
-
-### 3) Run the service
+3. Start app:
 
 ```bash
 sbt run
 ```
 
-Run on a custom port:
+4. App runs on:
+- `http://localhost:9000`
+
+## API Endpoints
+
+- `GET /api/health`
+- `POST /api/events`
+- `GET /api/events`
+- `GET /api/events/:id`
+- `PUT /api/events/:id`
+- `DELETE /api/events/:id`
+
+### Example: Create Event
 
 ```bash
-sbt -Dhttp.port=9001 run
+curl -X POST http://localhost:9000/api/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": 1,
+    "amount": 99.99,
+    "eventType": "purchase"
+  }'
 ```
 
----
-
-## API Reference
-
-### Health Check
-
-- **Method**: `GET`
-- **Path**: `/health`
-- **Response**: `200 OK`
-- **Body**: `OK`
-
-Example:
+### Example: Get All Events
 
 ```bash
-curl http://localhost:9000/health
+curl http://localhost:9000/api/events
 ```
 
----
+## Error Format
 
-## Database Evolution
+Errors are returned as JSON:
 
-Initial evolution file:
+```json
+{
+  "error": "not_found",
+  "message": "Event with id 10 not found"
+}
+```
 
-- `conf/evolutions/default/1.sql`
+## Database Evolutions
 
-### Schema created
+- `conf/evolutions/default/1.sql`: creates `events` table + indexes.
+- `conf/evolutions/default/2.sql`: converts `created_at` to timezone-aware timestamp.
 
-`events` table:
+## Next Improvements (Good Beginner Tasks)
 
-- `id SERIAL PRIMARY KEY`
-- `user_id INTEGER NOT NULL`
-- `amount NUMERIC(18,2) NOT NULL`
-- `event_type VARCHAR(100) NOT NULL`
-- `created_at TIMESTAMP NOT NULL DEFAULT NOW()`
-
-Indexes:
-
-- `idx_events_user_id`
-- `idx_events_created_at`
-- `idx_events_event_type`
-
----
-
-## Development Notes
-
-- This codebase currently provides the base backend infrastructure.
-- `repositories` and `services` directories are intentionally present for next-phase implementation.
-- Evolutions are enabled to keep DB schema in sync during development.
-
----
-
-## Next Suggested Milestones
-
-1. Add event ingestion endpoint(s) (e.g., create/list events)
-2. Implement repository layer with Slick queries
-3. Add service layer validations/business rules
-4. Add tests for controller, repository, and service layers
-5. Introduce analytics endpoints (totals, trends, user/event breakdown)
-
----
-
-## License
-
-Add a license file (`LICENSE`) if this project is intended for public/open-source use.
+1. Add unit tests for service methods.
+2. Add integration tests for controller endpoints.
+3. Add input validation rules (e.g., `amount > 0`).
+4. Add filtering APIs (by `userId`, `eventType`, date range).
