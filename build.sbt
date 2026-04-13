@@ -10,7 +10,8 @@ scalaVersion := "2.13.18"
 libraryDependencies ++= Seq(
   guice,
   "com.typesafe.play" %% "play-slick" % "5.1.0",
-  "com.typesafe.play" %% "play-slick-evolutions" % "5.1.0",
+  "org.flywaydb" % "flyway-core" % "11.0.1",
+  "org.flywaydb" % "flyway-database-postgresql" % "11.0.1",
   "org.postgresql" % "postgresql" % "42.7.1",
   "org.scalatestplus.play" %% "scalatestplus-play" % "5.1.0" % Test,
   "com.github.sbt" % "junit-interface" % "0.13.3" % Test

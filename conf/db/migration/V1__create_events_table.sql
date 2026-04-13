@@ -1,5 +1,3 @@
-# --- !Ups
-
 CREATE TABLE events (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL,
@@ -11,7 +9,3 @@ CREATE TABLE events (
 CREATE INDEX idx_events_user_id ON events(user_id);
 CREATE INDEX idx_events_created_at ON events(created_at);
 CREATE INDEX idx_events_event_type ON events(event_type);
-
-# --- !Downs
-
-DROP TABLE IF EXISTS events;
