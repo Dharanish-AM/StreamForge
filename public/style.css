@@ -31,9 +31,7 @@ body {
   color: var(--text-primary);
   line-height: 1.55;
   min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  padding: 2.5rem 1rem 3rem;
+  padding: 2rem 0 3rem;
   position: relative;
   overflow-x: clip;
 }
@@ -86,7 +84,8 @@ body {
 
 .container {
   width: 100%;
-  max-width: 1120px;
+  max-width: none;
+  padding-inline: clamp(0.9rem, 3vw, 2.8rem);
   display: grid;
   gap: 1.35rem;
 }
@@ -331,6 +330,7 @@ select:focus {
   grid-template-columns: minmax(250px, 1.6fr) repeat(3, minmax(145px, 1fr)) auto auto;
   gap: 0.6rem;
   align-items: center;
+  width: 100%;
 }
 
 .filter-input {
@@ -356,7 +356,7 @@ select:focus {
 
 .events-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 0.92rem;
 }
 
@@ -560,6 +560,14 @@ select:focus {
 }
 
 @media (max-width: 1024px) {
+  body {
+    padding-top: 1.5rem;
+  }
+
+  .container {
+    padding-inline: clamp(0.8rem, 2.6vw, 1.4rem);
+  }
+
   .dashboard-grid {
     grid-template-columns: repeat(2, minmax(170px, 1fr));
   }
@@ -576,7 +584,11 @@ select:focus {
 
 @media (max-width: 720px) {
   body {
-    padding: 1.2rem 0.8rem 1.8rem;
+    padding: 1.1rem 0 1.8rem;
+  }
+
+  .container {
+    padding-inline: 0.75rem;
   }
 
   .hero-title {
@@ -598,11 +610,17 @@ select:focus {
   .header-actions {
     display: flex;
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .search-input,
   .filter-input {
     width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .header-actions > .btn {
+    flex: 1 1 calc(50% - 0.3rem);
   }
 
   .event-card {
