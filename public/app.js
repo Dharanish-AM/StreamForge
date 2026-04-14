@@ -1,14 +1,134 @@
 document.addEventListener("DOMContentLoaded", () => {
   const eventForm = document.getElementById("eventForm");
-  const formMessage = document.getElementById("formMessage");
   const eventsContainer = document.getElementById("eventsContainer");
   const refreshBtn = document.getElementById("refreshBtn");
   const formTitle = document.getElementById("formTitle");
   const eventIdInput = document.getElementById("eventId");
   const submitBtn = document.getElementById("submitBtn");
   const cancelEditBtn = document.getElementById("cancelEditBtn");
+  const clearFormBtn = document.getElementById("clearFormBtn");
+  const clearFiltersBtn = document.getElementById("clearFiltersBtn");
+  const feedInfo = document.getElementById("feedInfo");
+  const searchInput = document.getElementById("searchInput");
+  const filterTypeInput = document.getElementById("filterEventType");
+  const filterUserInput = document.getElementById("filterUserId");
+  const sortEventsSelect = document.getElementById("sortEvents");
+  const userIdInput = document.getElementById("userId");
+  const amountInput = document.getElementById("amount");
+  const eventTypeInput = document.getElementById("eventType");
 
   const API_BASE = "/api/events";
+  let allEvents = [];
+  let isFetching = false;
+
+  const debounce = (fn, wait = 220) => {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => fn(...args), wait);
+    };
+  };
+
+  const inrFormatter = new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  const toCurrency = (value) => inrFormatter.format(Number(value) || 0);
+
+  const formatDate = (value) => {
+    if (!value) {
+      return "-";
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  };
+
+  const getRelativeTime = (value) => {
+    if (!value) {
+      return "-";
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+
+    const diffMs = date.getTime() - Date.now();
+    const absMs = Math.abs(diffMs);
+    const minutes = Math.round(absMs / 60000);
+    const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+
+    if (minutes < 60) {
+      return rtf.format(Math.round(diffMs / 60000), "minute");
+    }
+
+    const hours = Math.round(absMs / 3600000);
+    if (hours < 24) {
+      return rtf.format(Math.round(diffMs / 3600000), "hour");
+    }
+
+    const days = Math.round(absMs / 86400000);
+    return rtf.format(Math.round(diffMs / 86400000), "day");
+  };
+
+  const setRefreshingState = (loading) => {
+    isFetching = loading;
+    refreshBtn.disabled = loading;
+    refreshBtn.textContent = loading ? "Refreshing..." : "Refresh";
+  };
+
+  const updateDashboard = (events) => {
+    const totalVolume = events.reduce((sum, event) => sum + Number(event.amount), 0);
+    const averageAmount = events.length > 0 ? totalVolume / events.length : 0;
+    const uniqueUsers = new Set(events.map((event) => String(event.userId))).size;
+
+    document.getElementById("totalEventsCount").textContent = String(events.length);
+    document.getElementById("totalVolumeAmount").textContent = toCurrency(totalVolume);
+    document.getElementById("averageAmount").textContent = toCurrency(averageAmount);
+    document.getElementById("uniqueUsersCount").textContent = String(uniqueUsers);
+  };
+
+  const updateFeedInfo = (visibleCount, totalCount) => {
+    feedInfo.textContent = `Showing ${visibleCount} of ${totalCount} events`;
+  };
+
+  const extractErrorMessage = async (response) => {
+    const contentType = response.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      try {
+        const body = await response.json();
+        if (body && typeof body.message === "string") {
+          return body.message;
+        }
+      } catch (error) {
+        return "Request failed";
+      }
+
+      return "Request failed";
+    }
+
+    try {
+      const text = await response.text();
+      return text || "Request failed";
+    } catch (error) {
+      return "Request failed";
+    }
+  };
 
   const showMessage = (msg, isError) => {
     const toast = document.createElement("div");
@@ -32,7 +152,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
       toast.classList.remove("show");
       setTimeout(() => toast.remove(), 300);
-    }, 5000);
+    }, 3600);
   };
 
   const createEventCard = (event) => {
@@ -42,9 +162,9 @@ document.addEventListener("DOMContentLoaded", () => {
             <button class="delete-btn" data-id="${event.id}">
                 <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             </button>
-            <div class="event-detail">
+        <div class="event-top">
                 <span class="type-badge">${event.eventType}</span>
-                <span class="amount-value">$${parseFloat(event.amount).toFixed(2)}</span>
+          <span class="amount-value">${toCurrency(event.amount)}</span>
             </div>
             <div class="event-detail">
                 <span class="event-label">Event ID</span>
@@ -54,8 +174,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 <span class="event-label">User ID</span>
                 <span class="event-value">${event.userId}</span>
             </div>
-            <div style="position:absolute; bottom: 1.5rem; right: 1.5rem;">
-                <button class="edit-btn secondary-btn" style="padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.8rem;" data-id="${event.id}">Edit</button>
+        <div class="event-detail">
+          <span class="event-label">Created</span>
+          <span class="event-value" title="${formatDate(event.createdAt)}">${getRelativeTime(event.createdAt)}</span>
+        </div>
+        <div class="event-actions">
+          <button class="action-btn copy-btn" data-id="${event.id}">Copy ID</button>
+          <button class="action-btn edit-btn" data-id="${event.id}">Edit</button>
             </div>
         `;
 
@@ -69,11 +194,13 @@ document.addEventListener("DOMContentLoaded", () => {
             method: "DELETE",
           });
           if (res.ok) {
-            card.remove();
+            allEvents = allEvents.filter((item) => item.id !== event.id);
+            renderEvents();
+            updateDashboard(allEvents);
             showMessage("Event deleted successfully", false);
           } else {
-            const err = await res.json();
-            showMessage(err.message || "Failed to delete event", true);
+            const message = await extractErrorMessage(res);
+            showMessage(message || "Failed to delete event", true);
           }
         } catch (error) {
           showMessage("Network error occurred", true);
@@ -89,81 +216,137 @@ document.addEventListener("DOMContentLoaded", () => {
       formTitle.textContent = `Edit Event #${event.id}`;
       submitBtn.querySelector("span").textContent = "Update Event";
       cancelEditBtn.classList.remove("hidden");
+      userIdInput.focus();
       window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    card.querySelector(".copy-btn").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(String(event.id));
+        showMessage(`Copied Event ID #${event.id}`, false);
+      } catch (error) {
+        showMessage("Could not copy Event ID", true);
+      }
     });
 
     return card;
   };
 
-  const filterEvents = (events) => {
-    const typeFilter = document
-      .getElementById("filterEventType")
-      .value.toLowerCase();
-    const userFilter = document.getElementById("filterUserId").value;
+  const getFilteredAndSortedEvents = (events) => {
+    const typeFilter = filterTypeInput.value.trim().toLowerCase();
+    const userFilter = filterUserInput.value.trim();
+    const searchText = searchInput.value.trim().toLowerCase();
+    const sortBy = sortEventsSelect.value;
 
-    return events.filter((event) => {
+    let filtered = events.filter((event) => {
       const matchType =
         typeFilter === "" || event.eventType.toLowerCase().includes(typeFilter);
       const matchUser =
         userFilter === "" || event.userId.toString() === userFilter;
-      return matchType && matchUser;
+
+      const searchTarget = `${event.eventType} ${event.userId} ${event.id}`.toLowerCase();
+      const matchSearch = searchText === "" || searchTarget.includes(searchText);
+
+      return matchType && matchUser && matchSearch;
     });
+
+    filtered = filtered.sort((a, b) => {
+      if (sortBy === "newest") return b.id - a.id;
+      if (sortBy === "oldest") return a.id - b.id;
+      if (sortBy === "amount-high") return Number(b.amount) - Number(a.amount);
+      if (sortBy === "amount-low") return Number(a.amount) - Number(b.amount);
+      if (sortBy === "type-az") {
+        return a.eventType.localeCompare(b.eventType, undefined, { sensitivity: "base" });
+      }
+      return 0;
+    });
+
+    return filtered;
+  };
+
+  const showLoading = () => {
+    eventsContainer.innerHTML = '<div class="loading-spinner" aria-label="Loading events"></div>';
+  };
+
+  const renderEvents = () => {
+    const processedEvents = getFilteredAndSortedEvents(allEvents);
+    eventsContainer.innerHTML = "";
+    updateFeedInfo(processedEvents.length, allEvents.length);
+
+    if (processedEvents.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent =
+        allEvents.length === 0
+          ? "No events exist yet. Create one using the form above."
+          : "No events match your current filters.";
+      eventsContainer.appendChild(empty);
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    processedEvents.forEach((event) => {
+      fragment.appendChild(createEventCard(event));
+    });
+    eventsContainer.appendChild(fragment);
   };
 
   const fetchEvents = async () => {
-    eventsContainer.innerHTML = '<div class="loading-spinner"></div>';
+    if (!isFetching) {
+      showLoading();
+    }
+
+    setRefreshingState(true);
+
     try {
       const res = await fetch(API_BASE);
       if (!res.ok) {
-        throw new Error("Failed to fetch events");
+        throw new Error(await extractErrorMessage(res));
       }
 
-      const events = await res.json();
-      eventsContainer.innerHTML = "";
-
-      const totalVolume = events.reduce(
-        (sum, e) => sum + parseFloat(e.amount),
-        0,
-      );
-      document.getElementById("totalEventsCount").textContent = events.length;
-      document.getElementById("totalVolumeAmount").textContent =
-        "$" + totalVolume.toFixed(2);
-
-      const sortBy = document.getElementById("sortEvents").value;
-      let processedEvents = filterEvents(events);
-
-      processedEvents = processedEvents.sort((a, b) => {
-        if (sortBy === "newest") return b.id - a.id;
-        if (sortBy === "oldest") return a.id - b.id;
-        if (sortBy === "amount-high")
-          return parseFloat(b.amount) - parseFloat(a.amount);
-        if (sortBy === "amount-low")
-          return parseFloat(a.amount) - parseFloat(b.amount);
-        return 0;
-      });
-
-      if (processedEvents.length === 0) {
-        eventsContainer.innerHTML =
-          '<p class="subtitle">No recent events found.</p>';
-        return;
-      }
-
-      processedEvents.forEach((event) => {
-        eventsContainer.appendChild(createEventCard(event));
-      });
+      allEvents = await res.json();
+      updateDashboard(allEvents);
+      renderEvents();
     } catch (error) {
-      eventsContainer.innerHTML = `<p class="message error">Failed to load events: ${error.message}</p>`;
+      eventsContainer.innerHTML = `<p class="empty-state">Failed to load events: ${error.message}</p>`;
+      updateFeedInfo(0, 0);
+      updateDashboard([]);
+    } finally {
+      setRefreshingState(false);
     }
+  };
+
+  const validatePayload = (payload) => {
+    if (!Number.isInteger(payload.userId) || payload.userId <= 0) {
+      return "User ID must be a positive integer.";
+    }
+
+    if (Number.isNaN(payload.amount) || payload.amount <= 0) {
+      return "Amount (INR) must be greater than 0.";
+    }
+
+    if (!payload.eventType || payload.eventType.trim().length < 2) {
+      return "Event Type must contain at least 2 characters.";
+    }
+
+    return "";
   };
 
   eventForm.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const payload = {
-      userId: parseInt(document.getElementById("userId").value, 10),
-      amount: parseFloat(document.getElementById("amount").value),
-      eventType: document.getElementById("eventType").value,
+      userId: Number.parseInt(userIdInput.value, 10),
+      amount: Number.parseFloat(amountInput.value),
+      eventType: eventTypeInput.value.trim(),
     };
+
+    const validationError = validatePayload(payload);
+    if (validationError) {
+      showMessage(validationError, true);
+      return;
+    }
+
     const originalContent = submitBtn.innerHTML;
     submitBtn.innerHTML = "<span>Submitting...</span>";
     submitBtn.disabled = true;
@@ -189,11 +372,11 @@ document.addEventListener("DOMContentLoaded", () => {
           false,
         );
         resetForm();
-        fetchEvents();
+        await fetchEvents();
       } else {
-        const err = await res.json();
+        const message = await extractErrorMessage(res);
         showMessage(
-          err.message ||
+          message ||
             (eventId ? "Failed to update event" : "Failed to create event"),
           true,
         );
@@ -215,15 +398,32 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   cancelEditBtn.addEventListener("click", resetForm);
+  clearFormBtn.addEventListener("click", resetForm);
+
+  const clearFilters = () => {
+    searchInput.value = "";
+    filterTypeInput.value = "";
+    filterUserInput.value = "";
+    sortEventsSelect.value = "newest";
+    renderEvents();
+  };
+
+  clearFiltersBtn.addEventListener("click", clearFilters);
 
   refreshBtn.addEventListener("click", fetchEvents);
-  document
-    .getElementById("filterEventType")
-    .addEventListener("input", fetchEvents);
-  document
-    .getElementById("filterUserId")
-    .addEventListener("input", fetchEvents);
-  document.getElementById("sortEvents").addEventListener("change", fetchEvents);
+
+  const renderEventsDebounced = debounce(renderEvents, 220);
+  filterTypeInput.addEventListener("input", renderEventsDebounced);
+  filterUserInput.addEventListener("input", renderEventsDebounced);
+  searchInput.addEventListener("input", renderEventsDebounced);
+  sortEventsSelect.addEventListener("change", renderEvents);
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !cancelEditBtn.classList.contains("hidden")) {
+      resetForm();
+      showMessage("Edit cancelled", false);
+    }
+  });
 
   fetchEvents();
 });

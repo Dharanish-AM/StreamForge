@@ -34,11 +34,15 @@ app/
   tables/           # Slick table mapping
   models/           # domain model (Event)
   dto/              # input/output API payloads
-  errors/           # custom exceptions + JSON error handler
+  modules/          # startup wiring (Flyway runner module)
 conf/
   routes            # endpoint -> controller mapping
   application.conf  # app and DB configuration
-  evolutions/       # database migrations
+  db/migration/     # Flyway database migrations
+public/
+  index.html        # frontend console UI
+  app.js            # frontend behavior (fetch, filters, dashboard)
+  style.css         # UI styling
 ```
 
 ## Request Flow
@@ -49,6 +53,8 @@ For `POST /api/events` (same idea for other APIs):
 2. `EventService` applies business checks.
 3. `EventRepository` runs Slick query.
 4. Controller returns JSON response.
+
+Frontend flow (`GET /`) uses `public/app.js` to call `/api/events`, render cards, apply client-side filters/sorting, and compute dashboard counters.
 
 ## Prerequisites
 
@@ -75,6 +81,12 @@ sbt run
 4. App runs on:
 - `http://localhost:9000`
 
+If port `9000` is already in use, run on another port:
+
+```bash
+sbt -Dhttp.port=9001 run
+```
+
 ## API Endpoints
 
 - `GET /api/health`
@@ -86,12 +98,14 @@ sbt run
 
 ### Example: Create Event
 
+Amount values in examples below are in INR.
+
 ```bash
 curl -X POST http://localhost:9000/api/events \
   -H "Content-Type: application/json" \
   -d '{
     "userId": 1,
-    "amount": 99.99,
+    "amount": 450.00,
     "eventType": "purchase"
   }'
 ```
@@ -108,15 +122,26 @@ Errors are returned as JSON:
 
 ```json
 {
-  "error": "not_found",
   "message": "Event with id 10 not found"
 }
 ```
 
-## Database Evolutions
+## Database Migrations (Flyway)
 
-- `conf/evolutions/default/1.sql`: creates `events` table + indexes.
-- `conf/evolutions/default/2.sql`: converts `created_at` to timezone-aware timestamp.
+- `conf/db/migration/V1__create_events_table.sql`: creates `events` table + indexes.
+- `conf/db/migration/V2__events_created_at_to_timestamptz.sql`: converts `created_at` to timezone-aware timestamp.
+
+## Frontend Notes
+
+- Search filters by event type, user ID, and event ID.
+- Type/user filters apply live in the event feed.
+- Sorting supports newest, oldest, amount high/low, and type A-Z.
+- Dashboard counters are computed from fetched events:
+  - total events,
+  - total volume,
+  - average amount,
+  - unique users.
+- Feed info shows visible event count versus total event count.
 
 ## Next Improvements (Good Beginner Tasks)
 
