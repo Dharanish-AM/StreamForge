@@ -1,6 +1,7 @@
 GET     /api/health                     controllers.HealthController.health
 POST    /api/events                     controllers.EventController.createEvent
 GET     /api/events                     controllers.EventController.getAllEvents
+GET     /api/events/kpi                 controllers.EventController.getKpiStats
 GET     /api/events/:id                 controllers.EventController.getEventById(id: Int)
 PUT     /api/events/:id                 controllers.EventController.updateEvent(id: Int)
 DELETE  /api/events/:id                 controllers.EventController.deleteEvent(id: Int)

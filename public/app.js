@@ -18,6 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const eventTypeInput = document.getElementById("eventType");
 
   const API_BASE = "/api/events";
+  const KPI_API = `${API_BASE}/kpi`;
   let allEvents = [];
   let isFetching = false;
 
@@ -91,15 +92,11 @@ document.addEventListener("DOMContentLoaded", () => {
     refreshBtn.textContent = loading ? "Refreshing..." : "Refresh";
   };
 
-  const updateDashboard = (events) => {
-    const totalVolume = events.reduce((sum, event) => sum + Number(event.amount), 0);
-    const averageAmount = events.length > 0 ? totalVolume / events.length : 0;
-    const uniqueUsers = new Set(events.map((event) => String(event.userId))).size;
-
-    document.getElementById("totalEventsCount").textContent = String(events.length);
-    document.getElementById("totalVolumeAmount").textContent = toCurrency(totalVolume);
-    document.getElementById("averageAmount").textContent = toCurrency(averageAmount);
-    document.getElementById("uniqueUsersCount").textContent = String(uniqueUsers);
+  const updateDashboard = (kpiStats = {}) => {
+    document.getElementById("totalEventsCount").textContent = String(kpiStats.totalEvents ?? 0);
+    document.getElementById("totalVolumeAmount").textContent = toCurrency(kpiStats.totalVolume ?? 0);
+    document.getElementById("averageAmount").textContent = toCurrency(kpiStats.averageAmount ?? 0);
+    document.getElementById("uniqueUsersCount").textContent = String(kpiStats.uniqueUsers ?? 0);
   };
 
   const updateFeedInfo = (visibleCount, totalCount) => {
@@ -194,9 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
             method: "DELETE",
           });
           if (res.ok) {
-            allEvents = allEvents.filter((item) => item.id !== event.id);
-            renderEvents();
-            updateDashboard(allEvents);
+            await refreshData(false);
             showMessage("Event deleted successfully", false);
           } else {
             const message = await extractErrorMessage(res);
@@ -292,12 +287,6 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const fetchEvents = async () => {
-    if (!isFetching) {
-      showLoading();
-    }
-
-    setRefreshingState(true);
-
     try {
       const res = await fetch(API_BASE);
       if (!res.ok) {
@@ -305,15 +294,52 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       allEvents = await res.json();
-      updateDashboard(allEvents);
       renderEvents();
+      return true;
     } catch (error) {
       eventsContainer.innerHTML = `<p class="empty-state">Failed to load events: ${error.message}</p>`;
       updateFeedInfo(0, 0);
-      updateDashboard([]);
-    } finally {
-      setRefreshingState(false);
+      return false;
     }
+  };
+
+  const fetchKpiStats = async () => {
+    try {
+      const res = await fetch(KPI_API);
+      if (!res.ok) {
+        throw new Error(await extractErrorMessage(res));
+      }
+
+      const kpiStats = await res.json();
+      updateDashboard(kpiStats);
+      return true;
+    } catch (error) {
+      updateDashboard();
+      return false;
+    }
+  };
+
+  const refreshData = async (showSpinner = true) => {
+    if (!isFetching && showSpinner) {
+      showLoading();
+    }
+
+    setRefreshingState(true);
+
+    const [eventsResult, kpiResult] = await Promise.all([
+      fetchEvents(),
+      fetchKpiStats(),
+    ]);
+
+    if (!eventsResult) {
+      showMessage("Failed to load events", true);
+    }
+
+    if (!kpiResult) {
+      showMessage("Failed to load KPI stats", true);
+    }
+
+    setRefreshingState(false);
   };
 
   const validatePayload = (payload) => {
@@ -372,7 +398,7 @@ document.addEventListener("DOMContentLoaded", () => {
           false,
         );
         resetForm();
-        await fetchEvents();
+        await refreshData(false);
       } else {
         const message = await extractErrorMessage(res);
         showMessage(
@@ -410,7 +436,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   clearFiltersBtn.addEventListener("click", clearFilters);
 
-  refreshBtn.addEventListener("click", fetchEvents);
+  refreshBtn.addEventListener("click", () => refreshData(true));
 
   const renderEventsDebounced = debounce(renderEvents, 220);
   filterTypeInput.addEventListener("input", renderEventsDebounced);
@@ -425,5 +451,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  fetchEvents();
+  refreshData(true);
 });
