@@ -1,151 +1,138 @@
 # StreamForge
 
-StreamForge is a simple event-tracking backend built with Play Framework + Scala.
+StreamForge is a small event-tracking backend built with Play Framework and Scala. It stores events in PostgreSQL and exposes a simple HTTP API and a tiny frontend at the project `public/` directory.
 
-This README is written for beginners and focuses on:
-- what each layer does,
-- how request flow works,
-- and how to run and test the API quickly.
+**This update**: clarifies configuration, run/migration steps, and quick developer notes to get contributors up and running.
 
-## What This App Does
+**Tech stack**
 
-The app stores events in PostgreSQL and exposes CRUD APIs:
-- create an event,
-- list all events,
-- get one event by id,
-- update an event,
-- delete an event.
-
-## Tech Stack
-
-- Scala `2.13.18`
-- Play Framework
-- Slick + Play-Slick
+- Scala 2.13.18
+- Play Framework (Play Scala)
+- Slick + Play-Slick (database access)
 - PostgreSQL
-- SBT
+- Flyway (DB migrations)
+- SBT (build tool)
 
-## Project Layout (Beginner View)
+**Project layout (important files)**
 
-```text
-app/
-  controllers/      # HTTP layer: request/response handling
-  services/         # business rules and validation logic
-  repositories/     # database queries (Slick)
-  tables/           # Slick table mapping
-  models/           # domain model (Event)
-  dto/              # input/output API payloads
-  modules/          # startup wiring (Flyway runner module)
-conf/
-  routes            # endpoint -> controller mapping
-  application.conf  # app and DB configuration
-  db/migration/     # Flyway database migrations
-public/
-  index.html        # frontend console UI
-  app.js            # frontend behavior (fetch, filters, dashboard)
-  style.css         # UI styling
-```
+ - `app/controllers/` — HTTP controllers (request/response handling)
+ - `app/services/` — business logic (`EventService`)
+ - `app/repositories/` — Slick queries (`EventRepository`)
+ - `app/tables/` — Slick table mappings (`EventTable`)
+ - `app/models/` — domain models (`Event`)
+ - `app/dto/` — request/response DTOs
+ - `app/validator/` — business validation (`EventValidator`)
+ - `app/modules/` — startup wiring (`FlywayModule`, `FlywayMigrationRunner`)
+ - `conf/application.conf` — main configuration (DB, Flyway, Play)
+ - `conf/routes` — HTTP routes
+ - `conf/db/migration/` — Flyway SQL migrations
+ - `public/` — minimal frontend (index.html, app.js, style.css)
 
-## Request Flow
+**High-level request flow**
 
-For `POST /api/events` (same idea for other APIs):
+- Controller validates JSON and maps to domain model (e.g. `POST /api/events`).
+- Service (`EventService`) enforces business rules via `EventValidator`.
+- Repository (`EventRepository`) performs CRUD using Slick against the `events` table.
 
-1. `EventController` validates JSON and builds `Event`.
-2. `EventService` applies business checks.
-3. `EventRepository` runs Slick query.
-4. Controller returns JSON response.
-
-Frontend flow (`GET /`) uses `public/app.js` to call `/api/events`, render cards, apply client-side filters/sorting, and compute dashboard counters.
-
-## Prerequisites
+**Prerequisites**
 
 - JDK 17+
 - SBT
-- PostgreSQL
+- PostgreSQL (local or remote)
 
-## Run Locally
+**Configuration**
 
-1. Create DB:
+The app uses Slick for runtime DB access and Flyway for migrations. Check `conf/application.conf` for current defaults (the project uses a local DB URL by default):
+
+- `slick.dbs.default.db.url` — JDBC URL (default: `jdbc:postgresql://localhost:5432/streamforge`)
+- `slick.dbs.default.db.user` — DB user
+- `slick.dbs.default.db.password` — DB password
+- Flyway reads `flyway.url`, `flyway.user`, `flyway.password` which are wired to the Slick values in the same file.
+
+To change DB connection settings, edit [conf/application.conf](conf/application.conf#L1).
+
+Flyway is configured to run on application startup via `app/modules/FlywayModule.scala` and `app/modules/FlywayMigrationRunner.scala`. To disable automatic migrations, set `flyway.enabled = false` in `conf/application.conf`.
+
+**Database & migrations**
+
+Migrations live in `conf/db/migration/`.
+
+- `V1__create_events_table.sql` — creates the `events` table and indexes.
+- `V2__events_created_at_to_timestamptz.sql` — converts `created_at` to TIMESTAMPTZ.
+
+If you prefer to run Flyway manually (outside app startup), you can use the Flyway CLI or configure a separate script; the project already includes Flyway Core as a dependency in `build.sbt`.
+
+**Run locally**
+
+1. Create the DB (example using psql):
 
 ```sql
 CREATE DATABASE streamforge;
+CREATE USER streamforge_user WITH PASSWORD 'yourpassword';
+GRANT ALL PRIVILEGES ON DATABASE streamforge TO streamforge_user;
 ```
 
-2. Check DB config in `conf/application.conf`.
+2. Update `conf/application.conf` with your DB credentials (or set environment variables and/or an override file).
 
-3. Start app:
+3. Start the app (migrations run automatically if `flyway.enabled = true`):
 
 ```bash
 sbt run
 ```
 
-4. App runs on:
-- `http://localhost:9000`
-
-If port `9000` is already in use, run on another port:
+4. App defaults to http://localhost:9000. To change the port:
 
 ```bash
 sbt -Dhttp.port=9001 run
 ```
 
-## API Endpoints
+**Tests**
 
-- `GET /api/health`
-- `POST /api/events`
-- `GET /api/events`
-- `GET /api/events/:id`
-- `PUT /api/events/:id`
-- `DELETE /api/events/:id`
+Run the test suite with:
 
-### Example: Create Event
+```bash
+sbt test
+```
 
-Amount values in examples below are in INR.
+**API (quick reference)**
+
+- `GET /api/health` — health check
+- `POST /api/events` — create an event (JSON body)
+- `GET /api/events` — list events
+- `GET /api/events/:id` — fetch by id
+- `PUT /api/events/:id` — update
+- `DELETE /api/events/:id` — delete
+
+Example: create event
 
 ```bash
 curl -X POST http://localhost:9000/api/events \
   -H "Content-Type: application/json" \
-  -d '{
-    "userId": 1,
-    "amount": 450.00,
-    "eventType": "purchase"
-  }'
+  -d '{"userId":1,"amount":450.00,"eventType":"purchase"}'
 ```
 
-### Example: Get All Events
+Example: list events
 
 ```bash
 curl http://localhost:9000/api/events
 ```
 
-## Error Format
+**Validation & error format**
 
-Errors are returned as JSON:
+Validation logic lives in `app/validator/EventValidator.scala`. Controller responses return JSON objects with a `message` field for errors (400/404). See `app/controllers/EventController.scala` for examples and HTTP status codes.
 
-```json
-{
-  "message": "Event with id 10 not found"
-}
-```
+**Developer notes / next steps**
 
-## Database Migrations (Flyway)
+- Add unit tests for `EventValidator` and `EventService`.
+- Add controller integration tests (use Play's `GuiceOneAppPerSuite` / test helpers).
+- Add query filters and pagination to the repository and controller.
+- Consider adding a Dockerfile / docker-compose for local DB + app wiring.
 
-- `conf/db/migration/V1__create_events_table.sql`: creates `events` table + indexes.
-- `conf/db/migration/V2__events_created_at_to_timestamptz.sql`: converts `created_at` to timezone-aware timestamp.
+If you want, I can also:
 
-## Frontend Notes
+- add a `docker-compose.yml` to run Postgres + app
+- add a simple `Makefile` with common commands
+- scaffold unit test examples for `EventValidator`
 
-- Search filters by event type, user ID, and event ID.
-- Type/user filters apply live in the event feed.
-- Sorting supports newest, oldest, amount high/low, and type A-Z.
-- Dashboard counters are computed from fetched events:
-  - total events,
-  - total volume,
-  - average amount,
-  - unique users.
-- Feed info shows visible event count versus total event count.
-
-## Next Improvements (Good Beginner Tasks)
-
-1. Add unit tests for service methods.
-2. Add integration tests for controller endpoints.
-3. Add input validation rules (e.g., `amount > 0`).
-4. Add filtering APIs (by `userId`, `eventType`, date range).
+---
+Updated README to make onboarding and local development quicker.
