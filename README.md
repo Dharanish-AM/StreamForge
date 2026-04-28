@@ -34,6 +34,62 @@ StreamForge is a small event-tracking backend built with Play Framework and Scal
 - Service (`EventService`) enforces business rules via `EventValidator`.
 - Repository (`EventRepository`) performs CRUD using Slick against the `events` table.
 
+**Architecture**
+
+The project follows a layered architecture with clear separation of concerns. The diagram below shows the primary components and the typical call flow from HTTP to the database.
+
+```mermaid
+flowchart TB
+  subgraph API
+    EC[EventController]
+    HC[HealthController]
+  end
+
+  subgraph Filters
+    RL[RequestLoggingFilter]
+  end
+
+  subgraph DTOs
+    CR[CreateEventRequest]
+    UR[UpdateEventRequest]
+    ER[EventResponse]
+    KR[KpiResponse]
+  end
+
+  subgraph ServiceLayer
+    SVC[EventService]
+    VLD[EventValidator]
+  end
+
+  subgraph DataLayer
+    REP[EventRepository]
+    TBL[EventTable]
+    DB[(Postgres)]
+  end
+
+  RL --> EC
+  EC -->|uses DTOs| CR
+  EC -->|calls| SVC
+  HC -->|calls| SVC
+  SVC -->|validates| VLD
+  SVC -->|calls| REP
+  REP -->|maps| TBL
+  TBL -->|stores| DB
+```
+
+Key file mappings (examples):
+
+- Presentation / Controllers: [app/controllers/EventController.scala](app/controllers/EventController.scala), [app/controllers/HealthController.scala](app/controllers/HealthController.scala)
+- Filters: [app/filters/RequestLoggingFilter.scala](app/filters/RequestLoggingFilter.scala)
+- Service / Business logic: [app/services/EventService.scala](app/services/EventService.scala)
+- Validation: [app/validator/EventValidator.scala](app/validator/EventValidator.scala)
+- Repository / Data access: [app/repositories/EventRepository.scala](app/repositories/EventRepository.scala)
+- Persistence mapping: [app/tables/EventTable.scala](app/tables/EventTable.scala)
+- Domain model: [app/models/Event.scala](app/models/Event.scala)
+- DTOs: [app/dto/CreateEventRequest.scala](app/dto/CreateEventRequest.scala), [app/dto/EventResponse.scala](app/dto/EventResponse.scala), [app/dto/KpiResponse.scala](app/dto/KpiResponse.scala)
+
+This diagram and mapping should help contributors quickly identify where to add new features or tests while preserving separation of concerns.
+
 **Prerequisites**
 
 - JDK 17+
