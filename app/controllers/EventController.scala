@@ -54,6 +54,10 @@ class EventController @Inject() (
               )
             )
           )
+        }.recover {
+          case e: IllegalArgumentException =>
+            logger.warn(s"Validation failed: ${e.getMessage}")
+            BadRequest(Json.obj("message" -> e.getMessage))
         }
       }
     )
@@ -131,6 +135,10 @@ class EventController @Inject() (
                   logger.info(s"Updated event id=$id")
                   NoContent
                 }
+              }.recover {
+                case e: IllegalArgumentException =>
+                  logger.warn(s"Validation failed for id=$id: ${e.getMessage}")
+                  BadRequest(Json.obj("message" -> e.getMessage))
               }
 
             case None =>

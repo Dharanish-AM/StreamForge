@@ -9,6 +9,7 @@ import javax.inject.Inject
 import scala.concurrent.ExecutionContext
 import play.api.Logging
 import scala.util.{Failure, Success}
+import validator.EventValidator.validateEvent
 
 @Singleton
 class EventService @Inject() (eventRepository: EventRepository)(implicit ec: ExecutionContext)
@@ -29,7 +30,12 @@ class EventService @Inject() (eventRepository: EventRepository)(implicit ec: Exe
 
   def createEvent(event: Event): Future[Int] =
     trace(s"createEvent userId=${event.userId}, eventType=${event.eventType}") {
-      eventRepository.create(event)
+      validateEvent(event) match {
+        case Left(error) =>
+          Future.failed(new IllegalArgumentException(error))
+        case Right(validEvent) =>
+          eventRepository.create(validEvent)
+      }
     }
 
   def getAllEvents: Future[Seq[Event]] =
@@ -44,7 +50,12 @@ class EventService @Inject() (eventRepository: EventRepository)(implicit ec: Exe
 
   def updateEvent(id: Int, updatedEvent: Event): Future[Int] =
     trace(s"updateEvent id=$id") {
-      eventRepository.update(id, updatedEvent)
+      validateEvent(updatedEvent) match {
+        case Left(error) =>
+          Future.failed(new IllegalArgumentException(error))
+        case Right(validEvent) =>
+          eventRepository.update(id, validEvent)
+      }
     }
 
   def deleteEvent(id: Int): Future[Int] =
